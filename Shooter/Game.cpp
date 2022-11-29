@@ -66,7 +66,6 @@ void Game::Initialize(::IUnknown* window, int width, int height, DXGI_MODE_ROTAT
 }
 
 #pragma region Frame Update
-// Executes the basic game loop.
 void Game::Tick()
 {
 	m_timer.Tick([&]()
