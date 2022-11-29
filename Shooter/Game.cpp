@@ -26,15 +26,15 @@ namespace
 
 	// Mouse + Keyboard
 	const float MOUSE_ROTATION_GAIN				= 0.35f;
-	const float MOUSE_AIMING_ROTATION_GAIN		= 0.15f;
+	const float MOUSE_AIMING_ROTATION_GAIN		= 0.195f;
 
 	// Both
 	const float MOVEMENT_GAIN					= 3.7f;
-	const float MOVEMENT_SPRINTING_GAIN			= 10.7f;
+	const float MOVEMENT_SPRINTING_GAIN			= 7.7f;
 
 	// Weapon
-	constexpr Vector3 WEAPON_POSITION			= { 3.0f, -4.0f, -6.0f };
-	constexpr Vector3 WEAPON_POSITION_AIMING	= { 0.0f, -1.25f, -6.0f };
+	constexpr Vector3 WEAPON_POSITION			= { 3.0f, -1.0f, -7.0f };
+	constexpr Vector3 WEAPON_POSITION_AIMING	= { 0.0f, 0.0f, -1.2f };
 }
 
 Game::Game() noexcept(false) :
@@ -233,7 +233,8 @@ void Game::Update(DX::StepTimer const& timer)
 	}
 
 	if (kb.LeftShift) {
-		m_sprinting = true;
+		if (m_using_keyboard) m_sprinting = true;
+		m_using_keyboard = true;
 	}
 
 	//---------------------------------------------
@@ -242,12 +243,15 @@ void Game::Update(DX::StepTimer const& timer)
 
 	// Change FOV based on aiming state
 	m_fov = (m_aiming ?
-		Helpers::Lerp(m_hipfire_fov, m_aiming_fov, m_fov, elapsedTime * 400) :
-		Helpers::Lerp(m_aiming_fov, m_hipfire_fov, m_fov, elapsedTime * 400));
+		Helpers::Lerp(m_hipfire_fov, m_aiming_fov, m_fov, elapsedTime * 200) :
+		Helpers::Lerp(m_aiming_fov, m_hipfire_fov, m_fov, elapsedTime * 200));
 
 	m_weaponOffset = (m_aiming ?
-		Helpers::LerpVector3(WEAPON_POSITION, WEAPON_POSITION_AIMING, m_weaponOffset, elapsedTime * 10) :
-		Helpers::LerpVector3(WEAPON_POSITION_AIMING, WEAPON_POSITION, m_weaponOffset, elapsedTime * 10));
+		Helpers::LerpVector3(WEAPON_POSITION, WEAPON_POSITION_AIMING, m_weaponOffset, elapsedTime * 35) :
+		Helpers::LerpVector3(WEAPON_POSITION_AIMING, WEAPON_POSITION, m_weaponOffset, elapsedTime * 35));
+
+	if (move.x != 0 || move.y != 0 || move.z != 0) m_steps += elapsedTime * 10;
+	else m_steps = 0.0f;
 
 	// Limit camera rotation
 	constexpr float limit = XM_PIDIV2 - 0.01f;
@@ -262,6 +266,8 @@ void Game::Update(DX::StepTimer const& timer)
 	{
 		m_yaw += XM_2PI;
 	}
+
+	if (m_aiming) m_sprinting = false;
 
 	Quaternion q = Quaternion::CreateFromYawPitchRoll(m_yaw, 0.0f, 0.0f);
 	move = Vector3::Transform(move, q) * (m_sprinting ? MOVEMENT_SPRINTING_GAIN : MOVEMENT_GAIN) * elapsedTime;
@@ -315,9 +321,13 @@ void Game::Render()
 
 	Clear();
 
-	m_weapon->Draw(Matrix::Identity, Matrix::CreateTranslation(m_weaponOffset), m_proj);
-
 	auto context = m_deviceResources->GetD3DDeviceContext();
+
+	//m_weapon->Draw(Matrix::Identity, Matrix::CreateTranslation(m_weaponOffset), m_proj);
+	m_weapon->Draw(context, *m_states, Matrix::Identity, Matrix::CreateTranslation(m_weaponOffset * 
+		(m_aiming ?
+		Vector3(1, 1 - (sin(m_steps) / 16.0f), 1) :
+		Vector3(1.0f + (sin(m_steps) / 32.0f), 1.0f - (sin(m_steps) / 16.0f), 1 + (sin(cos(m_steps)) / 16.0f)))), m_gunProj);
 
 	auto renderTarget = m_deviceResources->GetRenderTargetView();
 	context->OMSetRenderTargets(1, &renderTarget, nullptr);
@@ -457,8 +467,8 @@ void Game::ValidateDevice()
 void Game::GetDefaultSize(int& width, int& height) const noexcept
 {
 	// TODO: Change to desired default window size (note minimum size is 320x200).
-	width = 800;
-	height = 600;
+	width = 1280;
+	height = 720;
 }
 #pragma endregion
 
@@ -473,8 +483,13 @@ void Game::CreateDeviceDependentResources()
 	m_room = GeometricPrimitive::CreateBox(context,
 		XMFLOAT3(ROOM_BOUNDS[0], ROOM_BOUNDS[1], ROOM_BOUNDS[2]),
 		false, true);
-	m_weapon = GeometricPrimitive::CreateBox(context,
-		XMFLOAT3(2.0f, 2.0f, 5.0f));
+	/*m_weapon = GeometricPrimitive::CreateBox(context,
+		XMFLOAT3(2.0f, 2.0f, 5.0f));*/
+
+	m_states = std::make_unique<CommonStates>(device);
+	m_fxFactory = std::make_unique<EffectFactory>(device);
+
+	m_weapon = Model::CreateFromCMO(device, L"Assets/m16.cmo", *m_fxFactory);
 
 	DX::ThrowIfFailed(
 		CreateDDSTextureFromFile(device, L"Assets/roomtexture.dds",
@@ -494,6 +509,10 @@ void Game::CreateWindowSizeDependentResources()
 	auto size = m_deviceResources->GetOutputSize();
 	m_proj = Matrix::CreatePerspectiveFieldOfView(
 		XMConvertToRadians(m_fov),
+		float(size.right) / float(size.bottom), m_near, m_far);
+
+	m_gunProj = Matrix::CreatePerspectiveFieldOfView(
+		XMConvertToRadians(70.0f),
 		float(size.right) / float(size.bottom), m_near, m_far);
 
 	m_renderTexture->SetWindow(size);

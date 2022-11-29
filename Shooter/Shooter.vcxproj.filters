@@ -57,5 +57,8 @@
   <ItemGroup>
     <None Include="Shooter_TemporaryKey.pfx" />
     <None Include="packages.config" />
+    <None Include="Assets\m16.cmo">
+      <Filter>Assets</Filter>
+    </None>
   </ItemGroup>
 </Project>

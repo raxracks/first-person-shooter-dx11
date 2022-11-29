@@ -65,11 +65,14 @@ private:
     std::unique_ptr<DirectX::Keyboard> m_keyboard;
     std::unique_ptr<DirectX::Mouse> m_mouse;
 
-    std::unique_ptr<DirectX::GeometricPrimitive> m_weapon;
+    std::unique_ptr<DirectX::Model> m_weapon;
+    
+    //std::unique_ptr<DirectX::GeometricPrimitive> m_weapon;
     std::unique_ptr<DirectX::GeometricPrimitive> m_room;
 
     DirectX::SimpleMath::Matrix m_view;
     DirectX::SimpleMath::Matrix m_proj;
+    DirectX::SimpleMath::Matrix m_gunProj;
 
     float m_pitch;
     float m_yaw;
@@ -102,4 +105,9 @@ private:
     std::unique_ptr<DirectX::SpriteBatch> m_sprites;
 
     DirectX::SimpleMath::Vector3 m_weaponOffset;
+
+    std::unique_ptr<DirectX::IEffectFactory> m_fxFactory;
+    std::unique_ptr<DirectX::CommonStates> m_states;
+
+    float m_steps = 0.0f;
 };
