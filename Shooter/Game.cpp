@@ -217,7 +217,7 @@ void Game::Update(DX::StepTimer const& timer)
 		Helpers::Lerp(m_aiming_fov, m_hipfire_fov, m_fov, elapsedTime * 400));
 
 	// Limit camera rotation
-	constexpr float limit = XM_PIDIV2 - 0.25f;
+	constexpr float limit = XM_PIDIV2 - 0.01f;
 	m_pitch = std::max(-limit, m_pitch);
 	m_pitch = std::min(+limit, m_pitch);
 
@@ -230,10 +230,8 @@ void Game::Update(DX::StepTimer const& timer)
 		m_yaw += XM_2PI;
 	}
 
-	// Calculate movement vector
-	Quaternion q = Quaternion::CreateFromYawPitchRoll(m_yaw, m_pitch, 0.0f);
+	Quaternion q = Quaternion::CreateFromYawPitchRoll(m_yaw, 0.0f, 0.0f);
 	move = Vector3::Transform(move, q) * MOVEMENT_GAIN * elapsedTime;
-	move.y = 0;
 
 	// Move camera by movement vector
 	m_cameraPos += move;
