@@ -17,6 +17,7 @@
       <Filter>Common</Filter>
     </ClCompile>
     <ClCompile Include="Helpers.cpp" />
+    <ClCompile Include="RenderTexture.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
@@ -28,6 +29,7 @@
       <Filter>Common</Filter>
     </ClInclude>
     <ClInclude Include="Helpers.h" />
+    <ClInclude Include="RenderTexture.h" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="Assets\Logo.scale-200.png">

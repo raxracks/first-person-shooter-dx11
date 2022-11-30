@@ -5,6 +5,7 @@
 #include "pch.h"
 #include "Game.h"
 #include <Helpers.h>
+#include <SpriteBatch.h>
 
 extern void ExitGame() noexcept;
 
@@ -15,28 +16,42 @@ using Microsoft::WRL::ComPtr;
 
 namespace
 {
-	const XMVECTORF32 START_POSITION = { 0.f, -1.5f, 0.f, 0.f };
-	const XMVECTORF32 ROOM_BOUNDS = { 8.f, 6.f, 12.f, 0.f };
+	// Dumb hardcoded shit
+	const XMVECTORF32 START_POSITION			= { 0.f, -1.5f, 0.f, 0.f };
+	const XMVECTORF32 ROOM_BOUNDS				= { 8.f, 6.f, 12.f, 0.f };
 
-	constexpr float ROTATION_GAIN = 3.2f;
-	constexpr float AIMING_ROTATION_GAIN = 1.8f;
+	// Controller
+	const float ROTATION_GAIN					= 3.8f;
+	const float AIMING_ROTATION_GAIN			= 1.8f;
 
-	constexpr float MOUSE_ROTATION_GAIN = 0.3f;
-	constexpr float MOUSE_AIMING_ROTATION_GAIN = 0.1f;
-	constexpr float MOVEMENT_GAIN = 3.7f;
+	// Mouse + Keyboard
+	const float MOUSE_ROTATION_GAIN				= 0.35f;
+	const float MOUSE_AIMING_ROTATION_GAIN		= 0.15f;
+
+	// Both
+	const float MOVEMENT_GAIN					= 3.7f;
+	const float MOVEMENT_SPRINTING_GAIN			= 10.7f;
+
+	// Weapon
+	constexpr Vector3 WEAPON_POSITION			= { 3.0f, -4.0f, -6.0f };
+	constexpr Vector3 WEAPON_POSITION_AIMING	= { 0.0f, -1.25f, -6.0f };
 }
 
 Game::Game() noexcept(false) :
 	m_pitch(0),
 	m_yaw(0),
 	m_cameraPos(START_POSITION),
-	m_roomColor(Colors::White)
+	m_roomColor(Colors::White),
+	m_weaponOffset(WEAPON_POSITION)
 {
 	m_deviceResources = std::make_unique<DX::DeviceResources>();
 	// TODO: Provide parameters for swapchain format, depth/stencil format, and backbuffer count.
 	//   Add DX::DeviceResources::c_AllowTearing to opt-in to variable rate displays.
 	//   Add DX::DeviceResources::c_EnableHDR for HDR10 display.
 	m_deviceResources->RegisterDeviceNotify(this);
+
+	m_renderTexture = std::make_unique<DX::RenderTexture>(
+		m_deviceResources->GetBackBufferFormat());
 }
 
 // Initialize the Direct3D resources required to run.
@@ -134,9 +149,16 @@ void Game::Update(DX::StepTimer const& timer)
 				move.z = pad.thumbSticks.leftY;
 				m_using_keyboard = false;
 			}
+			else {
+				if(!m_using_keyboard) m_sprinting = false;
+			}
 			if (pad.IsLeftThumbStickDown()) {
 				move.z = pad.thumbSticks.leftY;
 				m_using_keyboard = false;
+			}
+
+			if (pad.IsLeftStickPressed()) {
+				m_sprinting = true;
 			}
 		}
 
@@ -191,6 +213,9 @@ void Game::Update(DX::StepTimer const& timer)
 		move.z = 1.0f;
 		m_using_keyboard = true;
 	}
+	else {
+		if(m_using_keyboard) m_sprinting = false;
+	}
 
 	if (kb.Down || kb.S) {
 		move.z = -1.0f;
@@ -207,6 +232,10 @@ void Game::Update(DX::StepTimer const& timer)
 		m_using_keyboard = true;
 	}
 
+	if (kb.LeftShift) {
+		m_sprinting = true;
+	}
+
 	//---------------------------------------------
 	// Agnostic control
 	// --------------------------------------------
@@ -215,6 +244,10 @@ void Game::Update(DX::StepTimer const& timer)
 	m_fov = (m_aiming ?
 		Helpers::Lerp(m_hipfire_fov, m_aiming_fov, m_fov, elapsedTime * 400) :
 		Helpers::Lerp(m_aiming_fov, m_hipfire_fov, m_fov, elapsedTime * 400));
+
+	m_weaponOffset = (m_aiming ?
+		Helpers::LerpVector3(WEAPON_POSITION, WEAPON_POSITION_AIMING, m_weaponOffset, elapsedTime * 10) :
+		Helpers::LerpVector3(WEAPON_POSITION_AIMING, WEAPON_POSITION, m_weaponOffset, elapsedTime * 10));
 
 	// Limit camera rotation
 	constexpr float limit = XM_PIDIV2 - 0.01f;
@@ -231,7 +264,7 @@ void Game::Update(DX::StepTimer const& timer)
 	}
 
 	Quaternion q = Quaternion::CreateFromYawPitchRoll(m_yaw, 0.0f, 0.0f);
-	move = Vector3::Transform(move, q) * MOVEMENT_GAIN * elapsedTime;
+	move = Vector3::Transform(move, q) * (m_sprinting ? MOVEMENT_SPRINTING_GAIN : MOVEMENT_GAIN) * elapsedTime;
 
 	// Move camera by movement vector
 	m_cameraPos += move;
@@ -282,19 +315,59 @@ void Game::Render()
 
 	Clear();
 
-	auto context = m_deviceResources->GetD3DDeviceContext();
-	PIXBeginEvent(context, PIX_COLOR_DEFAULT, L"Render");
+	m_weapon->Draw(Matrix::Identity, Matrix::CreateTranslation(m_weaponOffset), m_proj);
 
-	// TODO: Add your rendering code here.
+	auto context = m_deviceResources->GetD3DDeviceContext();
+
+	auto renderTarget = m_deviceResources->GetRenderTargetView();
+	context->OMSetRenderTargets(1, &renderTarget, nullptr);
+
 	m_room->Draw(Matrix::Identity, m_view, m_proj,
 		m_roomColor, m_roomTex.Get());
 
-	PIXEndEvent(context);
+	m_sprites->Begin();
+
+	m_sprites->Draw(m_renderTexture->GetShaderResourceView(),
+		m_deviceResources->GetOutputSize());
+
+	m_sprites->End();
+
+	ID3D11ShaderResourceView* nullsrv[] = { nullptr };
+	context->PSSetShaderResources(0, 1, nullsrv);
 
 	// Show the new frame.
-	PIXBeginEvent(PIX_COLOR_DEFAULT, L"Present");
 	m_deviceResources->Present();
-	PIXEndEvent();
+
+	//auto context = m_deviceResources->GetD3DDeviceContext();
+	//PIXBeginEvent(context, PIX_COLOR_DEFAULT, L"Render");
+
+	//m_room->Draw(Matrix::Identity, m_view, m_proj,
+	//	m_roomColor, m_roomTex.Get());
+
+	//auto renderTarget = m_deviceResources->GetRenderTargetView();
+	//auto depthStencil = m_deviceResources->GetDepthStencilView();
+
+	//context->ClearRenderTargetView(renderTarget, Colors::CornflowerBlue);
+	//context->ClearDepthStencilView(depthStencil, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+	//context->OMSetRenderTargets(1, &renderTarget, depthStencil);
+
+	//// TODO: Add your rendering code here.
+	//m_room->Draw(Matrix::Identity, m_view, m_proj,
+	//	m_roomColor, m_roomTex.Get());
+
+	//m_sprites->Begin();
+
+	//m_sprites->Draw(m_renderTexture->GetShaderResourceView(),
+	//	m_deviceResources->GetOutputSize());
+
+	//m_sprites->End();
+
+	//PIXEndEvent(context);
+
+	//// Show the new frame.
+	//PIXBeginEvent(PIX_COLOR_DEFAULT, L"Present");
+	//m_deviceResources->Present();
+	//PIXEndEvent();
 }
 
 // Helper method to clear the back buffers.
@@ -303,13 +376,15 @@ void Game::Clear()
 	auto context = m_deviceResources->GetD3DDeviceContext();
 	PIXBeginEvent(context, PIX_COLOR_DEFAULT, L"Clear");
 
-	// Clear the views.
-	auto renderTarget = m_deviceResources->GetRenderTargetView();
+	auto renderTarget = m_renderTexture->GetRenderTargetView();
 	auto depthStencil = m_deviceResources->GetDepthStencilView();
 
-	context->ClearRenderTargetView(renderTarget, Colors::CornflowerBlue);
+	context->ClearRenderTargetView(renderTarget, Colors::Transparent);
 	context->ClearDepthStencilView(depthStencil, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 	context->OMSetRenderTargets(1, &renderTarget, depthStencil);
+
+	// Clear the views.
+	
 
 	// Set the viewport.
 	auto const viewport = m_deviceResources->GetScreenViewport();
@@ -398,10 +473,16 @@ void Game::CreateDeviceDependentResources()
 	m_room = GeometricPrimitive::CreateBox(context,
 		XMFLOAT3(ROOM_BOUNDS[0], ROOM_BOUNDS[1], ROOM_BOUNDS[2]),
 		false, true);
+	m_weapon = GeometricPrimitive::CreateBox(context,
+		XMFLOAT3(2.0f, 2.0f, 5.0f));
 
 	DX::ThrowIfFailed(
 		CreateDDSTextureFromFile(device, L"Assets/roomtexture.dds",
 			nullptr, m_roomTex.ReleaseAndGetAddressOf()));
+
+	m_sprites = std::make_unique<SpriteBatch>(context);
+
+	m_renderTexture->SetDevice(device);
 
 	device;
 }
@@ -414,6 +495,10 @@ void Game::CreateWindowSizeDependentResources()
 	m_proj = Matrix::CreatePerspectiveFieldOfView(
 		XMConvertToRadians(m_fov),
 		float(size.right) / float(size.bottom), m_near, m_far);
+
+	m_renderTexture->SetWindow(size);
+
+	m_sprites->SetRotation(m_deviceResources->GetRotation());
 }
 
 void Game::OnDeviceLost()
@@ -422,6 +507,8 @@ void Game::OnDeviceLost()
 	m_room.reset();
 	m_roomTex.Reset();
 	m_mouse->SetMode(Mouse::MODE_ABSOLUTE);
+	m_sprites.reset();
+	m_renderTexture->ReleaseDevice();
 }
 
 void Game::OnDeviceRestored()

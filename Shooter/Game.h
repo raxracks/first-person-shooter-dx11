@@ -6,6 +6,7 @@
 
 #include "DeviceResources.h"
 #include "StepTimer.h"
+#include "RenderTexture.h"
 
 
 // A basic game implementation that creates a D3D11 device and
@@ -64,6 +65,7 @@ private:
     std::unique_ptr<DirectX::Keyboard> m_keyboard;
     std::unique_ptr<DirectX::Mouse> m_mouse;
 
+    std::unique_ptr<DirectX::GeometricPrimitive> m_weapon;
     std::unique_ptr<DirectX::GeometricPrimitive> m_room;
 
     DirectX::SimpleMath::Matrix m_view;
@@ -93,4 +95,11 @@ private:
 
     float m_near = 0.01f;
     float m_far = 5000.0f;
+
+    bool m_sprinting = false;
+
+    std::unique_ptr<DX::RenderTexture> m_renderTexture;
+    std::unique_ptr<DirectX::SpriteBatch> m_sprites;
+
+    DirectX::SimpleMath::Vector3 m_weaponOffset;
 };
