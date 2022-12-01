@@ -81,6 +81,9 @@ private:
 
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_roomTex;
 
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_crosshair;
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_crosshair_h;
+
     DirectX::GamePad::ButtonStateTracker m_buttons;
     DirectX::Keyboard::KeyboardStateTracker m_keys;
     DirectX::Mouse::ButtonStateTracker m_mouseButtons;
@@ -107,6 +110,12 @@ private:
 
     std::unique_ptr<DirectX::IEffectFactory> m_fxFactory;
     std::unique_ptr<DirectX::CommonStates> m_states;
+
+    DirectX::SimpleMath::Vector2 m_screenPos;
+    DirectX::SimpleMath::Vector2 m_origin;
+    DirectX::SimpleMath::Vector2 m_origin_h;
+
+    float m_crosshair_spread;
 
     float m_steps;
 };

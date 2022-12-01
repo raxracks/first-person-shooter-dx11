@@ -333,6 +333,9 @@
     <None Include="Shooter_TemporaryKey.pfx" />
   </ItemGroup>
   <ItemGroup>
+    <Image Include="Assets\crosshair-h.png" />
+    <Image Include="Assets\crosshair-v.png" />
+    <Image Include="Assets\crosshair.png" />
     <Image Include="Assets\grid.png" />
     <Image Include="Assets\Logo.scale-200.png" />
     <Image Include="Assets\roomtexture.dds" />

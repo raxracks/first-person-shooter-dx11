@@ -31,6 +31,9 @@ namespace
 	const float MOVEMENT_GAIN					= 3.7f;
 	const float MOVEMENT_SPRINTING_GAIN			= 7.7f;
 
+	const float CROSSHAIR_SPREAD				= 30;
+	const float CROSSHAIR_SPREAD_SPRINTING		= 45;
+
 	// Weapon
 	constexpr Vector3 WEAPON_POSITION			= { 3.0f, -1.0f, -7.0f };
 	constexpr Vector3 WEAPON_POSITION_AIMING	= { 0.0f, 0.0f, -1.2f };
@@ -44,13 +47,14 @@ Game::Game() noexcept(false) :
 	m_weaponOffset(WEAPON_POSITION),
 	m_hipfire_fov(100.0f),
 	m_aiming_fov(70.0f),
-	m_fov(m_hipfire_fov),
+	m_fov(1.0f),
 	m_using_keyboard(false),
 	m_near(0.01f),
 	m_far(5000.0f),
 	m_sprinting(false),
 	m_steps(0.0f),
-	m_aiming(false)
+	m_aiming(false),
+	m_crosshair_spread(CROSSHAIR_SPREAD)
 {
 	m_deviceResources = std::make_unique<DX::DeviceResources>();
 	// TODO: Provide parameters for swapchain format, depth/stencil format, and backbuffer count.
@@ -259,6 +263,12 @@ void Game::Update(DX::StepTimer const& timer)
 		Helpers::LerpVector3(WEAPON_POSITION, WEAPON_POSITION_AIMING, m_weaponOffset, elapsedTime * 35) :
 		Helpers::LerpVector3(WEAPON_POSITION_AIMING, WEAPON_POSITION, m_weaponOffset, elapsedTime * 35));
 
+	m_crosshair_spread = (m_aiming ?
+		Helpers::Lerp(CROSSHAIR_SPREAD_SPRINTING, 15.0f, m_crosshair_spread, elapsedTime * 200) :
+		m_sprinting ?
+		Helpers::Lerp(m_crosshair_spread < CROSSHAIR_SPREAD ? 15 : CROSSHAIR_SPREAD + (sin(m_steps) * 3.0f), CROSSHAIR_SPREAD_SPRINTING + (sin(m_steps) * 3.0f), m_crosshair_spread, elapsedTime * 200) :
+		Helpers::Lerp(m_crosshair_spread < CROSSHAIR_SPREAD ? 15 : CROSSHAIR_SPREAD_SPRINTING + (sin(m_steps) * 3.0f), CROSSHAIR_SPREAD + (sin(m_steps) * 1.2f), m_crosshair_spread, elapsedTime * 200));
+
 	if (move.x != 0 || move.y != 0 || move.z != 0) m_steps += elapsedTime * 10;
 	else m_steps = 0.0f;
 
@@ -353,6 +363,20 @@ void Game::Render()
 	// Draw rendertexture view
 	m_sprites->Draw(m_renderTexture->GetShaderResourceView(),
 		m_deviceResources->GetOutputSize());
+
+	if (m_crosshair_spread > 15.0f) {
+		m_sprites->Draw(m_crosshair.Get(), m_screenPos + Vector2(0.0f, m_crosshair_spread), nullptr,
+			Colors::White, 0.f, m_origin);
+
+		m_sprites->Draw(m_crosshair.Get(), m_screenPos + Vector2(0.0f, -m_crosshair_spread), nullptr,
+			Colors::White, 0.f, m_origin);
+
+		m_sprites->Draw(m_crosshair_h.Get(), m_screenPos + Vector2(-m_crosshair_spread, 0.0f), nullptr,
+			Colors::White, 0.f, m_origin_h);
+
+		m_sprites->Draw(m_crosshair_h.Get(), m_screenPos + Vector2(m_crosshair_spread, 0.0f), nullptr,
+			Colors::White, 0.f, m_origin_h);
+	}
 
 	// End drawing of sprites for spritebatch
 	m_sprites->End();
@@ -470,6 +494,26 @@ void Game::CreateDeviceDependentResources()
 		CreateWICTextureFromFile(device, L"Assets/grid.png",
 			nullptr, m_roomTex.ReleaseAndGetAddressOf()));
 
+	ComPtr<ID3D11Resource> resource;
+	DX::ThrowIfFailed(
+		CreateWICTextureFromFile(device, L"Assets/crosshair-v.png",
+			resource.GetAddressOf(), m_crosshair.ReleaseAndGetAddressOf()));
+
+	DX::ThrowIfFailed(
+		CreateWICTextureFromFile(device, L"Assets/crosshair-h.png",
+			resource.GetAddressOf(), m_crosshair_h.ReleaseAndGetAddressOf()));
+
+	ComPtr<ID3D11Texture2D> crosshair;
+	DX::ThrowIfFailed(resource.As(&crosshair));
+
+	CD3D11_TEXTURE2D_DESC crosshairDesc;
+	crosshair->GetDesc(&crosshairDesc);
+
+	m_origin.x = 2.0f;
+	m_origin.y = 10.0f;
+	m_origin_h.x = m_origin.y;
+	m_origin_h.y = m_origin.x;
+
 	// Create sprite batch for rendering rendertexture
 	m_sprites = std::make_unique<SpriteBatch>(context);
 
@@ -497,6 +541,9 @@ void Game::CreateWindowSizeDependentResources()
 
 	// Required as devices could change orientation
 	m_sprites->SetRotation(m_deviceResources->GetRotation());
+
+	m_screenPos.x = float(size.right) / 2.f;
+	m_screenPos.y = float(size.bottom) / 2.f;
 }
 
 void Game::OnDeviceLost()

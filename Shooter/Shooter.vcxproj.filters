@@ -53,6 +53,15 @@
     <Image Include="Assets\grid.png">
       <Filter>Assets</Filter>
     </Image>
+    <Image Include="Assets\crosshair.png">
+      <Filter>Assets</Filter>
+    </Image>
+    <Image Include="Assets\crosshair-v.png">
+      <Filter>Assets</Filter>
+    </Image>
+    <Image Include="Assets\crosshair-h.png">
+      <Filter>Assets</Filter>
+    </Image>
   </ItemGroup>
   <ItemGroup>
     <AppxManifest Include="Package.appxmanifest" />
