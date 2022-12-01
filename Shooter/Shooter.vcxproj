@@ -133,6 +133,8 @@
   <PropertyGroup>
     <PackageCertificateKeyFile>Shooter_TemporaryKey.pfx</PackageCertificateKeyFile>
   </PropertyGroup>
+  <PropertyGroup Label="Vcpkg" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" />
+  <PropertyGroup Label="Vcpkg" Condition="'$(Configuration)|$(Platform)'=='Release|x64'" />
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
     <Link>
       <AdditionalDependencies>d2d1.lib; d3d11.lib; dxgi.lib; dxguid.lib; windowscodecs.lib; dwrite.lib; ole32.lib; %(AdditionalDependencies)</AdditionalDependencies>
@@ -331,6 +333,7 @@
     <None Include="Shooter_TemporaryKey.pfx" />
   </ItemGroup>
   <ItemGroup>
+    <Image Include="Assets\grid.png" />
     <Image Include="Assets\Logo.scale-200.png" />
     <Image Include="Assets\roomtexture.dds" />
     <Image Include="Assets\SmallLogo.scale-200.png" />

@@ -18,7 +18,7 @@ namespace
 {
 	// Dumb hardcoded shit
 	const XMVECTORF32 START_POSITION			= { 0.f, -1.5f, 0.f, 0.f };
-	const XMVECTORF32 ROOM_BOUNDS				= { 8.f, 6.f, 12.f, 0.f };
+	//const XMVECTORF32 ROOM_BOUNDS				= { 8.f, 6.f, 12.f, 0.f };
 
 	// Controller
 	const float ROTATION_GAIN					= 3.8f;
@@ -96,8 +96,6 @@ void Game::Update(DX::StepTimer const& timer)
 {
 	float elapsedTime = float(timer.GetElapsedSeconds());
 
-	PIXBeginEvent(PIX_COLOR_DEFAULT, L"Update");
-
 	//---------------------------------------------
 	// Update FOV on change
 	// --------------------------------------------
@@ -127,6 +125,7 @@ void Game::Update(DX::StepTimer const& timer)
 			ExitGame();
 		}
 
+		// Aiming
 		if (pad.triggers.left > 0.2f) {
 			m_aiming = true;
 			m_using_keyboard = false;
@@ -149,12 +148,13 @@ void Game::Update(DX::StepTimer const& timer)
 				move.z = pad.thumbSticks.leftY;
 				m_using_keyboard = false;
 			}
-			else {
-				if(!m_using_keyboard) m_sprinting = false;
-			}
 			if (pad.IsLeftThumbStickDown()) {
 				move.z = pad.thumbSticks.leftY;
 				m_using_keyboard = false;
+			}
+
+			if (!pad.IsLeftThumbStickLeft() && !pad.IsLeftThumbStickRight() && !pad.IsLeftThumbStickUp() && !pad.IsLeftThumbStickDown() && m_sprinting && !m_using_keyboard) {
+				m_sprinting = false;
 			}
 
 			if (pad.IsLeftStickPressed()) {
@@ -213,9 +213,6 @@ void Game::Update(DX::StepTimer const& timer)
 		move.z = 1.0f;
 		m_using_keyboard = true;
 	}
-	else {
-		if(m_using_keyboard) m_sprinting = false;
-	}
 
 	if (kb.Down || kb.S) {
 		move.z = -1.0f;
@@ -234,6 +231,10 @@ void Game::Update(DX::StepTimer const& timer)
 
 	if (kb.LeftShift) {
 		if (m_using_keyboard) m_sprinting = true;
+		m_using_keyboard = true;
+	}
+	else {
+		if (m_using_keyboard) m_sprinting = false;
 		m_using_keyboard = true;
 	}
 
@@ -269,18 +270,12 @@ void Game::Update(DX::StepTimer const& timer)
 
 	if (m_aiming) m_sprinting = false;
 
+	// Only use yaw so that y is not affected by camera pitch
 	Quaternion q = Quaternion::CreateFromYawPitchRoll(m_yaw, 0.0f, 0.0f);
 	move = Vector3::Transform(move, q) * (m_sprinting ? MOVEMENT_SPRINTING_GAIN : MOVEMENT_GAIN) * elapsedTime;
 
 	// Move camera by movement vector
 	m_cameraPos += move;
-
-	// Check if camera is in room bounds
-	Vector3 halfBound = (Vector3(ROOM_BOUNDS.v) / Vector3(2.f))
-		- Vector3(0.1f, 0.1f, 0.1f);
-
-	m_cameraPos = Vector3::Min(m_cameraPos, halfBound);
-	m_cameraPos = Vector3::Max(m_cameraPos, -halfBound);
 
 	// Calculate positions for lookAt vector
 	float y = sinf(m_pitch);
@@ -304,8 +299,6 @@ void Game::Update(DX::StepTimer const& timer)
 		else
 			m_roomColor = Colors::Red;
 	}
-
-	PIXEndEvent();
 }
 #pragma endregion
 
@@ -323,84 +316,63 @@ void Game::Render()
 
 	auto context = m_deviceResources->GetD3DDeviceContext();
 
-	//m_weapon->Draw(Matrix::Identity, Matrix::CreateTranslation(m_weaponOffset), m_proj);
+	//---------------------------------------------
+	// Render texture
+	// --------------------------------------------
+
+	// Draw weapon
 	m_weapon->Draw(context, *m_states, Matrix::Identity, Matrix::CreateTranslation(m_weaponOffset * 
 		(m_aiming ?
 		Vector3(1, 1 - (sin(m_steps) / 16.0f), 1) :
 		Vector3(1.0f + (sin(m_steps) / 32.0f), 1.0f - (sin(m_steps) / 16.0f), 1 + (sin(cos(m_steps)) / 16.0f)))), m_gunProj);
 
+	//---------------------------------------------
+	// Real view
+	// --------------------------------------------
+	
+	// Get real render target
 	auto renderTarget = m_deviceResources->GetRenderTargetView();
+	// Set render target to real render target
 	context->OMSetRenderTargets(1, &renderTarget, nullptr);
 
-	m_room->Draw(Matrix::Identity, m_view, m_proj,
+	// Draw floor
+	m_room->Draw(Matrix::Identity, Matrix::CreateTranslation(Vector3(0.0f, -4.0f, 0.0f)) * m_view, m_proj,
 		m_roomColor, m_roomTex.Get());
 
+	// Begin drawing of sprites for spritebatch
 	m_sprites->Begin();
 
+	// Draw rendertexture view
 	m_sprites->Draw(m_renderTexture->GetShaderResourceView(),
 		m_deviceResources->GetOutputSize());
 
+	// End drawing of sprites for spritebatch
 	m_sprites->End();
 
-	ID3D11ShaderResourceView* nullsrv[] = { nullptr };
-	context->PSSetShaderResources(0, 1, nullsrv);
+	/*ID3D11ShaderResourceView* nullsrv[] = { nullptr };
+	context->PSSetShaderResources(0, 1, nullsrv);*/
 
 	// Show the new frame.
 	m_deviceResources->Present();
-
-	//auto context = m_deviceResources->GetD3DDeviceContext();
-	//PIXBeginEvent(context, PIX_COLOR_DEFAULT, L"Render");
-
-	//m_room->Draw(Matrix::Identity, m_view, m_proj,
-	//	m_roomColor, m_roomTex.Get());
-
-	//auto renderTarget = m_deviceResources->GetRenderTargetView();
-	//auto depthStencil = m_deviceResources->GetDepthStencilView();
-
-	//context->ClearRenderTargetView(renderTarget, Colors::CornflowerBlue);
-	//context->ClearDepthStencilView(depthStencil, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
-	//context->OMSetRenderTargets(1, &renderTarget, depthStencil);
-
-	//// TODO: Add your rendering code here.
-	//m_room->Draw(Matrix::Identity, m_view, m_proj,
-	//	m_roomColor, m_roomTex.Get());
-
-	//m_sprites->Begin();
-
-	//m_sprites->Draw(m_renderTexture->GetShaderResourceView(),
-	//	m_deviceResources->GetOutputSize());
-
-	//m_sprites->End();
-
-	//PIXEndEvent(context);
-
-	//// Show the new frame.
-	//PIXBeginEvent(PIX_COLOR_DEFAULT, L"Present");
-	//m_deviceResources->Present();
-	//PIXEndEvent();
 }
 
 // Helper method to clear the back buffers.
 void Game::Clear()
 {
 	auto context = m_deviceResources->GetD3DDeviceContext();
-	PIXBeginEvent(context, PIX_COLOR_DEFAULT, L"Clear");
 
 	auto renderTarget = m_renderTexture->GetRenderTargetView();
+	auto realRenderTarget = m_deviceResources->GetRenderTargetView();
 	auto depthStencil = m_deviceResources->GetDepthStencilView();
 
 	context->ClearRenderTargetView(renderTarget, Colors::Transparent);
+	context->ClearRenderTargetView(realRenderTarget, Colors::CornflowerBlue);
 	context->ClearDepthStencilView(depthStencil, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 	context->OMSetRenderTargets(1, &renderTarget, depthStencil);
-
-	// Clear the views.
-	
 
 	// Set the viewport.
 	auto const viewport = m_deviceResources->GetScreenViewport();
 	context->RSSetViewports(1, &viewport);
-
-	PIXEndEvent(context);
 }
 #pragma endregion
 
@@ -454,8 +426,6 @@ void Game::OnWindowSizeChanged(int width, int height, DXGI_MODE_ROTATION rotatio
 		return;
 
 	CreateWindowSizeDependentResources();
-
-	// TODO: Game window is being resized.
 }
 
 void Game::ValidateDevice()
@@ -466,74 +436,75 @@ void Game::ValidateDevice()
 // Properties
 void Game::GetDefaultSize(int& width, int& height) const noexcept
 {
-	// TODO: Change to desired default window size (note minimum size is 320x200).
 	width = 1280;
 	height = 720;
 }
 #pragma endregion
 
 #pragma region Direct3D Resources
-// These are the resources that depend on the device.
 void Game::CreateDeviceDependentResources()
 {
 	auto device = m_deviceResources->GetD3DDevice();
 
-	// TODO: Initialize device dependent objects here (independent of window size).
 	auto context = m_deviceResources->GetD3DDeviceContext();
-	m_room = GeometricPrimitive::CreateBox(context,
-		XMFLOAT3(ROOM_BOUNDS[0], ROOM_BOUNDS[1], ROOM_BOUNDS[2]),
-		false, true);
-	/*m_weapon = GeometricPrimitive::CreateBox(context,
-		XMFLOAT3(2.0f, 2.0f, 5.0f));*/
 
+	// Create the things required for rendering 3d models
 	m_states = std::make_unique<CommonStates>(device);
 	m_fxFactory = std::make_unique<EffectFactory>(device);
 
+	// Load models
+	m_room = GeometricPrimitive::CreateBox(context,
+		XMFLOAT3(40.0f, 2.0f, 40.0f));
 	m_weapon = Model::CreateFromCMO(device, L"Assets/m16.cmo", *m_fxFactory);
 
+	// Load textures
 	DX::ThrowIfFailed(
-		CreateDDSTextureFromFile(device, L"Assets/roomtexture.dds",
+		CreateWICTextureFromFile(device, L"Assets/grid.png",
 			nullptr, m_roomTex.ReleaseAndGetAddressOf()));
 
+	// Create sprite batch for rendering rendertexture
 	m_sprites = std::make_unique<SpriteBatch>(context);
 
+	// Assign the device to the render texture
 	m_renderTexture->SetDevice(device);
-
-	device;
 }
 
-// Allocate all memory resources that change on a window SizeChanged event.
 void Game::CreateWindowSizeDependentResources()
 {
-	// TODO: Initialize windows-size dependent objects here.
+	// Get size of window
 	auto size = m_deviceResources->GetOutputSize();
+	
+	// Create camera project matrix
 	m_proj = Matrix::CreatePerspectiveFieldOfView(
 		XMConvertToRadians(m_fov),
 		float(size.right) / float(size.bottom), m_near, m_far);
 
+	// Create seperate gun camera project matrix
 	m_gunProj = Matrix::CreatePerspectiveFieldOfView(
 		XMConvertToRadians(70.0f),
 		float(size.right) / float(size.bottom), m_near, m_far);
-
+	 
+	// Set size of rendertexture
 	m_renderTexture->SetWindow(size);
 
+	// Required as devices could change orientation
 	m_sprites->SetRotation(m_deviceResources->GetRotation());
 }
 
 void Game::OnDeviceLost()
 {
-	// TODO: Add Direct3D resource cleanup here.
 	m_room.reset();
 	m_roomTex.Reset();
-	m_mouse->SetMode(Mouse::MODE_ABSOLUTE);
 	m_sprites.reset();
 	m_renderTexture->ReleaseDevice();
+	m_weapon.reset();
+	m_states.reset();
+	m_fxFactory.reset();
 }
 
 void Game::OnDeviceRestored()
 {
 	CreateDeviceDependentResources();
-
 	CreateWindowSizeDependentResources();
 }
 #pragma endregion

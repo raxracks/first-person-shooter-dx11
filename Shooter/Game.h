@@ -8,7 +8,6 @@
 #include "StepTimer.h"
 #include "RenderTexture.h"
 
-
 // A basic game implementation that creates a D3D11 device and
 // provides a game loop.
 class Game final : public DX::IDeviceNotify
@@ -88,7 +87,7 @@ private:
 
     bool m_aiming = false;
 
-    float m_fov = 90.0f;
+    float m_fov = 100.0f;
     float m_fov_previous = m_fov;
 
     float m_hipfire_fov = 100.0f;

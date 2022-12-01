@@ -50,6 +50,9 @@
     <Image Include="Assets\roomtexture.dds">
       <Filter>Assets</Filter>
     </Image>
+    <Image Include="Assets\grid.png">
+      <Filter>Assets</Filter>
+    </Image>
   </ItemGroup>
   <ItemGroup>
     <AppxManifest Include="Package.appxmanifest" />
