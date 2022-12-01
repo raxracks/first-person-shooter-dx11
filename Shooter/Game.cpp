@@ -17,8 +17,7 @@ using Microsoft::WRL::ComPtr;
 namespace
 {
 	// Dumb hardcoded shit
-	const XMVECTORF32 START_POSITION			= { 0.f, -1.5f, 0.f, 0.f };
-	//const XMVECTORF32 ROOM_BOUNDS				= { 8.f, 6.f, 12.f, 0.f };
+	const XMVECTORF32 START_POSITION			= { 0.f, 2.0f, 0.f, 0.f };
 
 	// Controller
 	const float ROTATION_GAIN					= 3.8f;
@@ -42,7 +41,16 @@ Game::Game() noexcept(false) :
 	m_yaw(0),
 	m_cameraPos(START_POSITION),
 	m_roomColor(Colors::White),
-	m_weaponOffset(WEAPON_POSITION)
+	m_weaponOffset(WEAPON_POSITION),
+	m_hipfire_fov(100.0f),
+	m_aiming_fov(70.0f),
+	m_fov(m_hipfire_fov),
+	m_using_keyboard(false),
+	m_near(0.01f),
+	m_far(5000.0f),
+	m_sprinting(false),
+	m_steps(0.0f),
+	m_aiming(false)
 {
 	m_deviceResources = std::make_unique<DX::DeviceResources>();
 	// TODO: Provide parameters for swapchain format, depth/stencil format, and backbuffer count.
@@ -336,7 +344,7 @@ void Game::Render()
 	context->OMSetRenderTargets(1, &renderTarget, nullptr);
 
 	// Draw floor
-	m_room->Draw(Matrix::Identity, Matrix::CreateTranslation(Vector3(0.0f, -4.0f, 0.0f)) * m_view, m_proj,
+	m_room->Draw(Matrix::Identity, m_view, m_proj,
 		m_roomColor, m_roomTex.Get());
 
 	// Begin drawing of sprites for spritebatch

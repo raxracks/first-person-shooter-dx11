@@ -85,20 +85,20 @@ private:
     DirectX::Keyboard::KeyboardStateTracker m_keys;
     DirectX::Mouse::ButtonStateTracker m_mouseButtons;
 
-    bool m_aiming = false;
+    bool m_aiming;
 
-    float m_fov = 100.0f;
+    float m_fov;
     float m_fov_previous = m_fov;
 
-    float m_hipfire_fov = 100.0f;
-    float m_aiming_fov = 70.0f;
+    float m_hipfire_fov;
+    float m_aiming_fov;
 
-    bool m_using_keyboard = false;
+    bool m_using_keyboard;
 
-    float m_near = 0.01f;
-    float m_far = 5000.0f;
+    float m_near;
+    float m_far;
 
-    bool m_sprinting = false;
+    bool m_sprinting;
 
     std::unique_ptr<DX::RenderTexture> m_renderTexture;
     std::unique_ptr<DirectX::SpriteBatch> m_sprites;
@@ -108,5 +108,5 @@ private:
     std::unique_ptr<DirectX::IEffectFactory> m_fxFactory;
     std::unique_ptr<DirectX::CommonStates> m_states;
 
-    float m_steps = 0.0f;
+    float m_steps;
 };
