@@ -31,7 +31,7 @@ namespace
 	const float MOVEMENT_GAIN					= 3.7f;
 	const float MOVEMENT_SPRINTING_GAIN			= 7.7f;
 
-	const float CROSSHAIR_SPREAD				= 30;
+	const float CROSSHAIR_SPREAD				= 20;
 	const float CROSSHAIR_SPREAD_SPRINTING		= 45;
 
 	// Weapon
@@ -45,6 +45,7 @@ Game::Game() noexcept(false) :
 	m_cameraPos(START_POSITION),
 	m_roomColor(Colors::White),
 	m_weaponOffset(WEAPON_POSITION),
+	m_weaponRotation(Vector3::Zero),
 	m_hipfire_fov(100.0f),
 	m_aiming_fov(70.0f),
 	m_fov(1.0f),
@@ -254,23 +255,40 @@ void Game::Update(DX::StepTimer const& timer)
 	// Agnostic control
 	// --------------------------------------------
 
+	if (m_aiming) m_sprinting = false;
+
 	// Change FOV based on aiming state
 	m_fov = (m_aiming ?
 		Helpers::Lerp(m_hipfire_fov, m_aiming_fov, m_fov, elapsedTime * 200) :
 		Helpers::Lerp(m_aiming_fov, m_hipfire_fov, m_fov, elapsedTime * 200));
 
-	m_weaponOffset = (m_aiming ?
-		Helpers::LerpVector3(WEAPON_POSITION, WEAPON_POSITION_AIMING, m_weaponOffset, elapsedTime * 35) :
-		Helpers::LerpVector3(WEAPON_POSITION_AIMING, WEAPON_POSITION, m_weaponOffset, elapsedTime * 35));
+	if (!(m_sprinting && m_walking)) {
+		m_weaponOffset = (m_aiming ?
+			Helpers::LerpVector3(WEAPON_POSITION, WEAPON_POSITION_AIMING, m_weaponOffset, elapsedTime * 35) :
+			Helpers::LerpVector3(WEAPON_POSITION_AIMING, WEAPON_POSITION, m_weaponOffset, elapsedTime * 35));
+	}
 
 	m_crosshair_spread = (m_aiming ?
 		Helpers::Lerp(CROSSHAIR_SPREAD_SPRINTING, 15.0f, m_crosshair_spread, elapsedTime * 200) :
-		m_sprinting ?
-		Helpers::Lerp(m_crosshair_spread < CROSSHAIR_SPREAD ? 15 : CROSSHAIR_SPREAD + (sin(m_steps) * 3.0f), CROSSHAIR_SPREAD_SPRINTING + (sin(m_steps) * 3.0f), m_crosshair_spread, elapsedTime * 200) :
-		Helpers::Lerp(m_crosshair_spread < CROSSHAIR_SPREAD ? 15 : CROSSHAIR_SPREAD_SPRINTING + (sin(m_steps) * 3.0f), CROSSHAIR_SPREAD + (sin(m_steps) * 1.2f), m_crosshair_spread, elapsedTime * 200));
+		(m_sprinting && m_walking) ?
+		0 :
+		m_walking ? 
+		Helpers::Lerp(m_crosshair_spread < CROSSHAIR_SPREAD ? 15 : CROSSHAIR_SPREAD, CROSSHAIR_SPREAD + 10, m_crosshair_spread, elapsedTime * 200) :
+		Helpers::Lerp(m_crosshair_spread < CROSSHAIR_SPREAD ? 15 : CROSSHAIR_SPREAD + 10, CROSSHAIR_SPREAD, m_crosshair_spread, elapsedTime * 200));
 
-	if (move.x != 0 || move.y != 0 || move.z != 0) m_steps += elapsedTime * 10;
+	m_walking = move.x != 0 || move.y != 0 || move.z != 0;
+
+	if (m_sprinting && m_walking) m_steps += elapsedTime * 15;
+	else if (m_walking) m_steps += elapsedTime * 10;
 	else m_steps = 0.0f;
+
+	if (m_sprinting && m_walking) {
+		m_weaponRotation = Helpers::LerpVector3(Vector3::Zero, Vector3(-0.52359885040181208815, 0.872665f, 0.0f), m_weaponRotation, elapsedTime * 10);
+		m_weaponOffset = Helpers::LerpVector3(WEAPON_POSITION, WEAPON_POSITION + Vector3(-1.f, -0.2f, 4.f), m_weaponOffset, elapsedTime * 100);
+	}
+	else {
+		m_weaponRotation = Helpers::LerpVector3(Vector3(-0.174533f, 0.872665f, 0.0f), Vector3::Zero, m_weaponRotation, elapsedTime * 10);
+	}
 
 	// Limit camera rotation
 	constexpr float limit = XM_PIDIV2 - 0.01f;
@@ -339,7 +357,7 @@ void Game::Render()
 	// --------------------------------------------
 
 	// Draw weapon
-	m_weapon->Draw(context, *m_states, Matrix::Identity, Matrix::CreateTranslation(m_weaponOffset * 
+	m_weapon->Draw(context, *m_states, Matrix::Identity, Matrix::CreateFromYawPitchRoll(m_weaponRotation) * Matrix::CreateTranslation(m_weaponOffset * 
 		(m_aiming ?
 		Vector3(1, 1 - (sin(m_steps) / 16.0f), 1) :
 		Vector3(1.0f + (sin(m_steps) / 32.0f), 1.0f - (sin(m_steps) / 16.0f), 1 + (sin(cos(m_steps)) / 16.0f)))), m_gunProj);

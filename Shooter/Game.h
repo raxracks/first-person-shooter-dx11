@@ -107,6 +107,7 @@ private:
     std::unique_ptr<DirectX::SpriteBatch> m_sprites;
 
     DirectX::SimpleMath::Vector3 m_weaponOffset;
+    DirectX::SimpleMath::Vector3 m_weaponRotation;
 
     std::unique_ptr<DirectX::IEffectFactory> m_fxFactory;
     std::unique_ptr<DirectX::CommonStates> m_states;
@@ -118,4 +119,6 @@ private:
     float m_crosshair_spread;
 
     float m_steps;
+
+    bool m_walking = false;
 };
